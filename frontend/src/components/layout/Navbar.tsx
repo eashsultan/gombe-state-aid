@@ -21,16 +21,16 @@ export default function Navbar() {
   if (pathname?.startsWith('/admin')) return null;
 
   return (
-    <header className="sticky top-3 z-50 mx-3 sm:mx-6 rounded-[1.75rem] border border-white/10 bg-emerald-950 shadow-[0_12px_40px_rgba(0,0,0,0.25)] transition-all duration-300">
+    <header className="fixed top-3 inset-x-3 sm:inset-x-6 z-50 rounded-[1.75rem] border border-white/10 bg-emerald-950 shadow-[0_12px_40px_rgba(0,0,0,0.25)] transition-all duration-300">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div className="flex h-24 items-center justify-between">
           <Link href="/" className="flex items-center gap-4 group">
             <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center transform group-hover:-rotate-3 transition-transform duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
               <svg className="w-6 h-6 text-emerald-950" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-[10px] font-bold tracking-[0.2em] text-emerald-400 uppercase transition-colors">Gombe State Government</span>
-              <span className="font-black text-2xl text-white tracking-tight leading-none mt-0.5">
+              <span className="font-black text-xl sm:text-2xl text-white tracking-tight leading-none mt-0.5 truncate">
                 HIV-TB SUMMIT<span className="text-rose-500">.</span>
               </span>
             </div>
@@ -74,7 +74,7 @@ export default function Navbar() {
         </div>
 
         {open && (
-          <nav className="lg:hidden border-t border-white/10 px-2 pb-4 pt-2">
+          <nav className="lg:hidden border-t border-white/10 px-2 pb-4 pt-2 max-h-[70vh] overflow-y-auto">
             {NAV_LINKS.map((l) => (
               <Link
                 key={l.href}

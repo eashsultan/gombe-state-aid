@@ -1,8 +1,9 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
-import { getResend, getResendFrom } from '@/lib/resend'
+import { getResend } from '@/lib/resend'
 import { buildSender, parseCustomRecipients, plainToHtml, summitEmailShell } from '@/lib/email-templates'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { revalidatePath } from 'next/cache'
 
 export async function updateRegistrationStatus(id: string, status: string) {
@@ -185,6 +186,53 @@ export type SendEmailInput = {
   fromLocal?: string
   subject: string
   message: string
+  files?: File[]
+}
+
+const ATTACH_MAX_FILES = 3
+const ATTACH_MAX_BYTES = 5 * 1024 * 1024
+const ATTACH_BLOCKED = ['exe', 'bat', 'cmd', 'com', 'scr', 'ps1', 'sh', 'js', 'msi']
+
+function validateAttachments(files: File[]): { ok: boolean; error?: string } {
+  if (files.length > ATTACH_MAX_FILES) {
+    return { ok: false, error: `Attach at most ${ATTACH_MAX_FILES} files.` }
+  }
+  let total = 0
+  for (const f of files) {
+    const ext = (f.name.split('.').pop() || '').toLowerCase()
+    if (ATTACH_BLOCKED.includes(ext)) {
+      return { ok: false, error: `"${f.name}" is not an allowed file type.` }
+    }
+    if (f.size > ATTACH_MAX_BYTES) {
+      return { ok: false, error: `"${f.name}" exceeds 5 MB.` }
+    }
+    total += f.size
+  }
+  if (total > 9 * 1024 * 1024) {
+    return { ok: false, error: 'Attachments total more than 9 MB.' }
+  }
+  return { ok: true }
+}
+
+export async function getInboundEmailBody(emailId: string): Promise<{ success: boolean; html?: string; text?: string; error?: string }> {
+  const resend = getResend()
+  if (!resend) {
+    return { success: false, error: 'Email service is not configured (RESEND_API_KEY missing).' }
+  }
+  if (!emailId) return { success: false, error: 'No email reference stored.' }
+  try {
+    const { data, error } = await resend.emails.get(emailId)
+    if (error || !data) {
+      return { success: false, error: typeof error?.message === 'string' ? error.message : 'Could not fetch email content.' }
+    }
+    const html = typeof data.html === 'string' ? data.html : undefined
+    const text = typeof data.text === 'string' ? data.text : undefined
+    if (!html && !text) return { success: false, error: 'No readable content stored for this email.' }
+    return { success: true, html, text }
+  } catch (err) {
+    console.error('Error fetching inbound email:', err)
+    return { success: false, error: 'Could not fetch email content.' }
+  }
 }
 
 export async function previewSummitEmail(input: { subject: string; message: string }) {
@@ -227,20 +275,74 @@ export async function sendSummitEmail(input: SendEmailInput) {
     }
     const html = summitEmailShell({ subject, heading: subject, bodyHtml: plainToHtml(message) })
     const from = buildSender(input.fromName, input.fromLocal)
+    const files = (input.files || []).filter((f) => f && f.size > 0)
+    const check = validateAttachments(files)
+    if (!check.ok) {
+      return { success: false, sent: 0, failed: 0, error: check.error }
+    }
+    const buffers = await Promise.all(
+      files.map(async (f) => ({ name: f.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120), content: Buffer.from(await f.arrayBuffer()) }))
+    )
+    // Archive to private bucket + record the send before dispatching.
+    const record = await prisma.sentEmail.create({
+      data: {
+        subject,
+        fromName: (input.fromName || 'Gombe Summit').trim() || 'Gombe Summit',
+        fromLocal: (input.fromLocal || 'updates').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'updates',
+        audience: input.audience,
+        recipientCount: emails.length,
+        recipients: emails.slice(0, 500),
+        attachments: [],
+      },
+    })
+    const storedPaths: Array<{ name: string; path: string }> = []
+    const supabase = getSupabaseAdmin()
+    if (buffers.length > 0) {
+      if (!supabase) {
+        await prisma.sentEmail.delete({ where: { id: record.id } })
+        return { success: false, sent: 0, failed: 0, error: 'File archive is not configured. Remove attachments or try later.' }
+      }
+      for (const b of buffers) {
+        const path = `sent/${record.id}/${b.name}`
+        const { error: uploadError } = await supabase.storage.from('email-attachments').upload(path, b.content, { upsert: true })
+        if (uploadError) {
+          console.error('Attachment archive error:', uploadError)
+          await prisma.sentEmail.delete({ where: { id: record.id } })
+          return { success: false, sent: 0, failed: 0, error: 'Attachment archiving failed. Please try again.' }
+        }
+        storedPaths.push({ name: b.name, path })
+      }
+      await prisma.sentEmail.update({ where: { id: record.id }, data: { attachments: storedPaths } })
+    }
+    const attachments = buffers.map((b) => ({ filename: b.name, content: b.content }))
     let sent = 0
     let failed = 0
+    let firstError = ''
     for (let i = 0; i < emails.length; i += 10) {
       const chunk = emails.slice(i, i + 10)
       const results = await Promise.allSettled(
-        chunk.map((email) => resend.emails.send({ from, to: email, subject, html }))
+        chunk.map((email) =>
+          resend.emails.send({ from, to: email, subject, html, attachments: attachments.length ? attachments : undefined })
+        )
       )
       for (const res of results) {
-        if (res.status === 'fulfilled' && !res.value.error) sent += 1
-        else failed += 1
+        if (res.status === 'fulfilled' && !res.value.error) {
+          sent += 1
+        } else {
+          failed += 1
+          if (!firstError) {
+            firstError =
+              (res.status === 'fulfilled' && (res.value.error as { message?: string } | null)?.message) ||
+              (res.status === 'rejected' ? String(res.reason) : 'Unknown error')
+          }
+        }
       }
     }
     revalidatePath('/admin/emails')
-    return { success: failed === 0, sent, failed }
+    if (failed > 0) {
+      return { success: false, sent, failed, error: `Resend rejected the send: ${firstError}` }
+    }
+    return { success: true, sent, failed }
   } catch (error) {
     console.error('Error sending summit email:', error)
     return { success: false, sent: 0, failed: 0, error: 'Failed to send emails.' }

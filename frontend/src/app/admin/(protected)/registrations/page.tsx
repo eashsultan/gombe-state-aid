@@ -65,7 +65,7 @@ export default async function AdminRegistrations() {
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-500">{reg.createdAt.toLocaleDateString()}</td>
                     <td className="py-3 px-4 text-sm">
-                      <RegistrationActions id={reg.id} currentStatus={reg.status} />
+                      <RegistrationActions id={reg.id} currentStatus={reg.status} checkInStatus={reg.checkInStatus} />
                     </td>
                   </tr>
                 ))

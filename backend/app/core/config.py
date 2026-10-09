@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379/0"
     STORAGE_DIR: str = "/data/uploads"
     FRONTEND_URL: str = "http://localhost:3000"
+    RESEND_WEBHOOK_SECRET: str = ""
 
 
 @lru_cache

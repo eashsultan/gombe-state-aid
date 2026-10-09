@@ -10,6 +10,7 @@ export default function EmailComposer() {
   const [fromLocal, setFromLocal] = useState('updates')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
+  const [files, setFiles] = useState<File[]>([])
   const [status, setStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
   const [result, setResult] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
@@ -29,13 +30,14 @@ export default function EmailComposer() {
     if (!confirm(`Send this email to ${target}?`)) return
     setStatus('sending')
     setResult('')
-    const res = await sendSummitEmail({ audience, customTo, fromName, fromLocal, subject, message })
+    const res = await sendSummitEmail({ audience, customTo, fromName, fromLocal, subject, message, files })
     if (res.success) {
       setStatus('done')
       setResult(`Sent to ${res.sent} recipient${res.sent === 1 ? '' : 's'}.`)
       setSubject('')
       setMessage('')
       setCustomTo('')
+      setFiles([])
     } else {
       setStatus('error')
       setResult(res.error || `Sent ${res.sent}, failed ${res.failed}.`)
@@ -99,6 +101,32 @@ export default function EmailComposer() {
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={8} placeholder="Write your announcement. Blank lines become paragraphs." className={input} />
         </div>
 
+        <div>
+          <label className="block text-xs font-bold text-gray-600 mb-1">Attachments (max 3, 5 MB each)</label>
+          <input
+            type="file"
+            multiple
+            onChange={(e) => setFiles(Array.from(e.target.files || []).slice(0, 3))}
+            className="w-full rounded-xl border border-gray-300 p-2.5 bg-gray-50 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-950 file:text-white file:text-xs file:font-bold hover:file:bg-emerald-900 transition-all"
+          />
+          {files.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {files.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5">
+                  <span className="font-semibold text-gray-700 truncate">{f.name} ({(f.size / 1024).toFixed(0)} KB)</span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles(files.filter((_, j) => j !== i))}
+                    className="text-red-600 hover:text-red-800 font-bold ml-3"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         {result && (
           <div className={`${status === 'done' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'} p-3 rounded-xl text-sm font-semibold`}>
             {result}
@@ -121,9 +149,6 @@ export default function EmailComposer() {
             {status === 'sending' ? 'Sending...' : 'Send Branded Email'}
           </button>
         </div>
-        <p className="text-xs text-gray-500">
-          Sent from your verified domain via the summit-branded template. Requires RESEND_API_KEY on the server.
-        </p>
       </form>
 
       {showPreview && previewHtml && (

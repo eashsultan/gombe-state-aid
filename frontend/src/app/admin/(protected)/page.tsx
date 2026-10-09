@@ -10,6 +10,7 @@ export default async function AdminDashboard() {
     pendingAbstracts,
     totalSpeakers,
     totalPartners,
+    checkedInCount,
     recentRegistrations
   ] = await Promise.all([
     prisma.registration.count(),
@@ -17,11 +18,13 @@ export default async function AdminDashboard() {
     prisma.abstract.count({ where: { status: 'SUBMITTED' } }),
     prisma.speaker.count(),
     prisma.partner.count(),
+    prisma.registration.count({ where: { checkInStatus: true } }),
     prisma.registration.findMany({
       take: 5,
       orderBy: { createdAt: 'desc' }
     })
   ]);
+  const checkInRate = totalRegistrations > 0 ? Math.round((checkedInCount / totalRegistrations) * 100) : 0;
 
   return (
     <div>
@@ -44,6 +47,14 @@ export default async function AdminDashboard() {
         <div className="bg-white p-6 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.03)] border border-gray-100">
           <div className="text-sm font-medium text-gray-500 mb-1">Partners & Sponsors</div>
           <div className="text-3xl font-bold text-gray-900">{totalPartners}</div>
+        </div>
+        <div className="bg-emerald-950 p-6 rounded-xl shadow-[0_4px_20px_rgb(0,0,0,0.08)] border border-emerald-900">
+          <div className="text-sm font-medium text-emerald-300 mb-1">Checked-In Participants</div>
+          <div className="text-3xl font-bold text-white">{checkedInCount}</div>
+          <div className="mt-3 h-2 rounded-full bg-emerald-900 overflow-hidden">
+            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${checkInRate}%` }} />
+          </div>
+          <div className="text-xs text-emerald-300 mt-2">{checkInRate}% of all registrations</div>
         </div>
       </div>
       

@@ -255,3 +255,15 @@ model AuditLog {
   details      Json?
   createdAt    DateTime @default(now())
 }
+
+model SentEmail {
+  id             String   @id @default(cuid())
+  subject        String
+  fromName       String   @default("Gombe Summit")
+  fromLocal      String   @default("updates")
+  audience       String   @default("custom")
+  recipientCount Int      @default(0)
+  recipients     String[]
+  attachments    Json?
+  sentAt         DateTime @default(now())
+}

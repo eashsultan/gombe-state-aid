@@ -1,6 +1,10 @@
-"""Vercel Python runtime entrypoint: re-export the FastAPI app.
+"""Vercel Python runtime entrypoint: serve the FastAPI app via Mangum (ASGI -> serverless).
 
 Services mode builds the `backend` service with root=backend, so this file
-is served as the serverless function handling all routed requests.
+is the serverless function handling all routed requests.
 """
-from app.main import app  # noqa: F401  (Vercel looks for `app` here)
+from mangum import Mangum
+
+from app.main import app
+
+handler = Mangum(app, lifespan="off")

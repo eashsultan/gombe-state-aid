@@ -46,7 +46,7 @@ export default async function Home() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#064e3b_1px,transparent_1px),linear-gradient(to_bottom,#064e3b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_70%,transparent_100%)] opacity-20"></div>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[600px] bg-emerald-500/20 blur-[120px] rounded-full pointer-events-none"></div>
 
-        <div className="container relative z-20 mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl pt-24 pb-40">
+        <div className="container relative z-20 mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl pt-32 sm:pt-36 pb-40">
           
           <div className="inline-flex items-center mb-8 bg-emerald-900/50 border border-emerald-700/50 rounded-full px-5 py-2 backdrop-blur-md shadow-lg">
             <span className="text-emerald-100 font-bold tracking-[0.2em] text-[10px] sm:text-xs uppercase">
